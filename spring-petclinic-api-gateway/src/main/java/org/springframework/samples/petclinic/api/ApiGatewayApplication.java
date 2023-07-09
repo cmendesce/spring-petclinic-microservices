@@ -37,6 +37,7 @@ import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import java.time.Duration;
+import java.util.Optional;
 
 
 /**
@@ -65,6 +66,24 @@ public class ApiGatewayApplication {
     @Value("classpath:/static/index.html")
     private Resource indexHtml;
 
+    @Value("${failureRateThreshold:}")
+    private Float failureRateThreshold;
+    @Value("${slidingWindowSize:}")
+    private Integer slidingWindowSize;
+    @Value("${minimumNumberOfCalls:}")
+    private Integer minimumNumberOfCalls;
+    @Value("${waitDurationInOpenState:}")
+    private Integer waitDurationInOpenState; // [ms]
+    @Value("${permittedNumberOfCallsInHalfOpenState:}")
+    private Integer permittedNumberOfCallsInHalfOpenState;
+    @Value("${slowCallRateThreshold:}")
+    private Integer slowCallRateThreshold;
+    @Value("${slowCallDurationThreshold:}")
+    private Integer slowCallDurationThreshold; //[ms]
+
+    @Value("${timeLimiter:4}")
+    private Integer timeLimiter;
+
     /**
      * workaround solution for forwarding to index.html
      * @see <a href="https://github.com/spring-projects/spring-boot/issues/9785">#9785</a>
@@ -78,13 +97,34 @@ public class ApiGatewayApplication {
     }
 
     /**
-     * Default Resilience4j circuit breaker configuration
+     * Resilience4j circuit breaker configuration
      */
     @Bean
-    public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer() {
+    public CircuitBreakerConfig buildCircuitBreakerConfig() {
+        if (failureRateThreshold == null && slidingWindowSize == null && minimumNumberOfCalls == null && waitDurationInOpenState == null
+            && permittedNumberOfCallsInHalfOpenState == null && slowCallRateThreshold == null && slowCallDurationThreshold == null) {
+            return CircuitBreakerConfig.ofDefaults();
+        } else {
+            var customConfig = CircuitBreakerConfig.custom();
+            Optional.ofNullable(failureRateThreshold).ifPresent(customConfig::failureRateThreshold);
+            Optional.ofNullable(slidingWindowSize).ifPresent(customConfig::slidingWindowSize);
+            Optional.ofNullable(minimumNumberOfCalls).ifPresent(customConfig::minimumNumberOfCalls);
+            Optional.ofNullable(waitDurationInOpenState).ifPresent(value -> customConfig.waitDurationInOpenState(Duration.ofMillis(value)));
+            Optional.ofNullable(permittedNumberOfCallsInHalfOpenState).ifPresent(customConfig::permittedNumberOfCallsInHalfOpenState);
+            Optional.ofNullable(slowCallRateThreshold).ifPresent(customConfig::slowCallRateThreshold);
+            Optional.ofNullable(slowCallDurationThreshold).ifPresent((value) -> customConfig.slowCallDurationThreshold(Duration.ofMillis(value)));
+            return customConfig.build();
+        }
+    }
+
+    /**
+     * Default resilience configuration
+     */
+    @Bean
+    public Customizer<ReactiveResilience4JCircuitBreakerFactory> defaultCustomizer(CircuitBreakerConfig cbConfig) {
         return factory -> factory.configureDefault(id -> new Resilience4JConfigBuilder(id)
-            .circuitBreakerConfig(CircuitBreakerConfig.ofDefaults())
-            .timeLimiterConfig(TimeLimiterConfig.custom().timeoutDuration(Duration.ofSeconds(4)).build())
+            .circuitBreakerConfig(cbConfig)
+            .timeLimiterConfig(TimeLimiterConfig.custom().timeoutDuration(Duration.ofSeconds(timeLimiter)).build())
             .build());
     }
 }
