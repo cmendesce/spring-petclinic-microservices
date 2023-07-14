@@ -12,16 +12,16 @@ jobs:
     strategy:
       matrix:
         java: ["17"]
-        image:
-          [
-            "spring-petclinic-admin-server",
-            "spring-petclinic-customers-service",
-            "spring-petclinic-vets-service",
-            "spring-petclinic-visits-service",
-            "spring-petclinic-config-server",
-            "spring-petclinic-discovery-server",
-            "spring-petclinic-api-gateway",
-          ]
+        # image:
+        #   [
+        #     "spring-petclinic-admin-server",
+        #     "spring-petclinic-customers-service",
+        #     "spring-petclinic-vets-service",
+        #     "spring-petclinic-visits-service",
+        #     "spring-petclinic-config-server",
+        #     "spring-petclinic-discovery-server",
+        #     "spring-petclinic-api-gateway",
+        #   ]
 
     steps:
       - name: Checkout
@@ -46,3 +46,6 @@ jobs:
           java-version: ${{matrix.java}}
           distribution: "adopt"
           cache: maven
+
+      - name: Build with Maven
+        run: mvn package docker:build -PbuildDocker
